@@ -2,11 +2,11 @@
 'use strict';
 const desktopApp = require('byteballcore/desktop_app.js');
 const conf = require('byteballcore/conf');
-const moment = require('moment');
-
 
 exports.help = () => {
-	return `I'm a bot of exchanging ${conf.assetToReceiveName} for ${conf.assetToSellName}\nPlease enter the amount of ${conf.assetToSellName} multiple ${conf.assetToSellMultiple}`;
+	return `I'm a bot of exchanging ${conf.assetToReceiveName} for ${conf.assetToSellName}\nPlease enter the amount of ${conf.assetToSellName}`
+		+ ((conf.assetToSellMultiple !== 1) ? ` multiple ${conf.assetToSellMultiple / conf.assetToSellUnitValue}` : '')
+		+ '\nExchange rate: ' + conf.exchangeRate;
 };
 
 exports.insertMyAddress = () => {
@@ -14,16 +14,16 @@ exports.insertMyAddress = () => {
 };
 
 exports.pleaseUnlock = () => {
-	return 'Please withdraw your funds from the insurance smart address.';
+	return 'Please withdraw your funds from the exchange smart address.';
 };
 
 exports.weSentPayment = () => {
-	return 'We sent you your compensation.';
+	return 'We sent you your ' + conf.assetToSellName + '.';
 };
 
 //errors
 exports.errorInitSql = () => {
-	return 'please import insurance.sql file\n';
+	return 'please import exchange.sql file\n';
 };
 
 exports.errorSmtp = () => {

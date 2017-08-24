@@ -3,6 +3,7 @@
 const conf = require('byteballcore/conf');
 const headlessWallet = require('headless-byteball');
 const db = require('byteballcore/db');
+const storage = require('byteballcore/storage');
 
 module.exports = (myAddress, contract, cb) => {
 	let device = require('byteballcore/device.js');
@@ -21,16 +22,15 @@ module.exports = (myAddress, contract, cb) => {
 	if (contract.peerAsset === null) contract.peerAsset = 'base';
 
 
-	//let timeout = Date.now() + Math.round(contract.timeout * 3600 * 1000);
-	let timeout = Date.now() + Math.round(contract.timeout * 3 * 1000);
+	let timeout = Date.now() + Math.round(contract.timeout * 3600 * 1000);
 	let arrSeenCondition = ['seen', {
 		what: 'output',
 		address: myAddress,
 		asset: contract.peerAsset,
 		amount: contract.peerAmount
 	}];
-	determineIfAssetIsPrivate(contract.myAsset, (isPrivate) => {
-		let arrConditions = (contract.myAsset === 'base' || isPrivate)
+	storage.readAsset(db, conf.assetToSell, null, (err, objAsset) => {
+		let arrConditions = (contract.myAsset === 'base' || objAsset.is_private)
 			? ['and', [
 				['address', contract.peerAddress],
 				arrSeenCondition
@@ -60,7 +60,7 @@ module.exports = (myAddress, contract, cb) => {
 			]]
 		]];
 
-		let assocSignersByPath = (contract.myAsset === 'base' || isPrivate)
+		let assocSignersByPath = (contract.myAsset === 'base' || objAsset.is_private)
 			? {
 				'r.0.0': {
 					address: contract.peerAddress,
@@ -120,9 +120,3 @@ module.exports = (myAddress, contract, cb) => {
 		});
 	});
 };
-
-function determineIfAssetIsPrivate(asset, cb) {
-	db.query("SELECT 1 FROM assets WHERE unit = ? AND is_private=1 LIMIT 1", [asset], function (rows) {
-		cb(rows.length > 0);
-	});
-}

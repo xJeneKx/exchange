@@ -10,6 +10,7 @@ const validationUtils = require('byteballcore/validation_utils');
 const notifications = require('./notifications');
 const contract = require('./contract');
 const wallet = require('byteballcore/wallet');
+const storage = require('byteballcore/storage');
 
 let assocWaitingStableSharedAddressByUnits = {};
 let assocAmountByDeviceAddress = {};
@@ -18,8 +19,8 @@ headlessWallet.setupChatEventHandlers();
 
 function payToPeer(contractRow) {
 	let device = require('byteballcore/device');
-	determineIfAssetIsPrivate(conf.assetToSell, (isPrivate) => {
-		if (conf.assetToSell === null || isPrivate) {
+	storage.readAsset(db, conf.assetToSell, null, (err, objAsset) => {
+		if (conf.assetToSell === null || objAsset.is_private) {
 			device.sendMessageToDevice(contractRow.peer_device_address, 'text', texts.pleaseUnlock());
 			contract.setUnlockedContract(contractRow.shared_address, null);
 		} else {
@@ -94,12 +95,12 @@ eventBus.on('text', (from_address, text) => {
 				return device.sendMessageToDevice(from_address, 'text', 'This is your contract, please check and pay within 15 minutes: ' + paymentRequestText);
 			});
 		});
-	} else if (ucText.match(/^[0-9]+$/)) {
-		let amount = parseInt(text);
+	} else if (/[\d.]+\b/.test(ucText)) {
+		let amount = parseFloat(ucText.match(/[\d.]+\b/)[0]) * conf.assetToSellUnitValue;
 		if (amount % conf.assetToSellMultiple === 0) {
 			assocAmountByDeviceAddress[from_address] = amount;
 			return device.sendMessageToDevice(from_address, 'text',
-				'Price: ' + (amount * conf.exchangeRate) + ' ' + conf.assetToReceiveName +
+				'Price: ' + ((amount * conf.exchangeRate) / conf.assetToReceiveUnitValue) + ' ' + conf.assetToReceiveName +
 				'\nTo continue, send me your address (click ... and Insert my address).');
 		} else {
 			return device.sendMessageToDevice(from_address, 'text', 'The number is not a multiple of ' + conf.assetToSellMultiple);
@@ -157,6 +158,10 @@ eventBus.on('headless_wallet_ready', () => {
 		if (error)
 			throw new Error(error);
 
+		storage.readAsset(db, conf.assetToSell, null, (err) => {
+			if (err) throw new Error(err)
+		});
+
 		setInterval(contract.checkAndRefundContractsTimeout, 3600 * 1000);
 		contract.checkAndRefundContractsTimeout();
 
@@ -167,9 +172,3 @@ eventBus.on('headless_wallet_ready', () => {
 		setInterval(sendReport, 24 * 3600 * 1000);
 	});
 });
-
-function determineIfAssetIsPrivate(asset, cb) {
-	db.query("SELECT 1 FROM assets WHERE unit = ? AND is_private=1 LIMIT 1", [asset], function (rows) {
-		cb(rows.length > 0);
-	});
-}
