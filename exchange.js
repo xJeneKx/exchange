@@ -114,10 +114,10 @@ function sendReport() {
 	getBalanceForAsset(conf.assetToSell, (balanceAssetToSell) => {
 		getBalanceForAsset(conf.assetToReceive, (balanceAssetToReceive) => {
 			db.query(
-				"SELECT shared_address, creation_date, peer_amount/1e9 AS premium, my_amount/1e9 AS coverage FROM contracts \n\
+				"SELECT shared_address, creation_date, peer_amount/1e9 AS receive_amount, my_amount/1e9 AS sell_amount FROM contracts \n\
 				WHERE refunded=0  ORDER BY rowid",
 				rows => {
-					let arrNewContracts = rows.map(row => row.shared_address + ' - ' + row.creation_date + ' : ' + row.premium + ' ' + conf.assetToReceiveName + ', ' + row.coverage + ' ' + conf.assetToSellName);
+					let arrNewContracts = rows.map(row => row.shared_address + ' - ' + row.creation_date + ' : ' + row.receive_amount + ' ' + conf.assetToReceiveName + ', ' + row.sell_amount + ' ' + conf.assetToSellName);
 					let body = 'Total: ' + balanceAssetToSell.total + ' ' + conf.assetToSellName + ', ' + balanceAssetToReceive.total + ' ' + conf.assetToReceiveName + '\n';
 					body += 'Free: ' + balanceAssetToSell.total_free + ' ' + conf.assetToSellName + ', ' + balanceAssetToReceive.total_free + ' ' + conf.assetToReceiveName + '\n';
 					body += 'Contracted: ' + balanceAssetToSell.total_shared + ' ' + conf.assetToSellName + ', ' + balanceAssetToReceive.total_shared + ' ' + conf.assetToReceiveName + '\n\n';
@@ -167,34 +167,20 @@ eventBus.on('headless_wallet_ready', () => {
 });
 
 function getBalanceForAsset(asset, cb) {
-	if (asset === null) {
-		db.query("SELECT SUM(amount) AS total_free FROM my_addresses CROSS JOIN outputs USING(address) WHERE is_spent=0 AND asset IS NULL", rows => {
-			db.query(
-				"SELECT SUM(amount) AS total_shared FROM shared_addresses CROSS JOIN outputs ON shared_address=outputs.address \n\
-				WHERE is_spent=0 AND asset IS NULL",
-				rows2 => {
-					calculate(rows, rows2);
-				})
-		});
-	} else {
-		db.query("SELECT SUM(amount) AS total_free FROM my_addresses CROSS JOIN outputs USING(address) WHERE is_spent=0 AND asset = ?", [asset], rows => {
-			db.query(
-				"SELECT SUM(amount) AS total_shared FROM shared_addresses CROSS JOIN outputs ON shared_address=outputs.address \n\
-				WHERE is_spent=0 AND asset = ?", [asset],
-				rows2 => {
-					calculate(rows, rows2);
-				})
-		});
-	}
-
-	function calculate(rows, rows2) {
-		let total_free = rows[0].total_free / 1e9;
-		let total_shared = rows2[0].total_shared / 1e9;
-		let total = total_free + total_shared;
-		cb({
-			total_free: total_free,
-			total_shared: total_shared,
-			total: total
-		});
-	}
+	let asset_condition = (asset && asset !== "base") ? "asset=" + db.escape(asset) : "asset IS NULL";
+	db.query("SELECT SUM(amount) AS total_free FROM my_addresses CROSS JOIN outputs USING(address) WHERE is_spent=0 AND " + asset_condition, rows => {
+		db.query(
+			"SELECT SUM(amount) AS total_shared FROM shared_addresses CROSS JOIN outputs ON shared_address=outputs.address \n\
+			WHERE is_spent=0 AND " + asset_condition,
+			rows2 => {
+				let total_free = rows[0].total_free / 1e9;
+				let total_shared = rows2[0].total_shared / 1e9;
+				let total = total_free + total_shared;
+				cb({
+					total_free: total_free,
+					total_shared: total_shared,
+					total: total
+				});
+			})
+	});
 }
