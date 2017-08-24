@@ -97,13 +97,17 @@ eventBus.on('text', (from_address, text) => {
 		});
 	} else if (/[\d.]+\b/.test(ucText)) {
 		let amount = Math.round(parseFloat(ucText.match(/[\d.]+\b/)[0]) * conf.assetToSellUnitValue);
-		if (amount % conf.assetToSellMultiple === 0) {
-			assocAmountByDeviceAddress[from_address] = amount;
-			return device.sendMessageToDevice(from_address, 'text',
-				'Price: ' + ((amount * conf.exchangeRate) / conf.assetToReceiveUnitValue) + ' ' + conf.assetToReceiveName +
-				'\nTo continue, send me your address (click ... and Insert my address).');
-		} else {
-			return device.sendMessageToDevice(from_address, 'text', 'The number is not a multiple of ' + conf.assetToSellMultiple);
+		if(amount > 0) {
+			if (amount % conf.assetToSellMultiple === 0) {
+				assocAmountByDeviceAddress[from_address] = amount;
+				return device.sendMessageToDevice(from_address, 'text',
+					'Price: ' + ((amount * conf.exchangeRate) / conf.assetToReceiveUnitValue) + ' ' + conf.assetToReceiveName +
+					'\nTo continue, send me your address (click ... and Insert my address).');
+			} else {
+				return device.sendMessageToDevice(from_address, 'text', 'The number is not a multiple of ' + conf.assetToSellMultiple);
+			}
+		}else{
+			return device.sendMessageToDevice(from_address, 'text', 'Enter a number greater than zero');
 		}
 	} else {
 		return device.sendMessageToDevice(from_address, 'text', texts.help());
